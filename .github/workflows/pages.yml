@@ -1,0 +1,63 @@
+# Assemble the org landing page for GitHub Pages. Nothing here needs a
+# build step: index.html loads every package from jsDelivr, not a local
+# copy of the source.
+#
+# Layout deployed:
+#   /                    landing page (root index.html)
+#   /live/               live coding REPL + iframe player, from jmon/show
+#
+# One-time setup in repo Settings → Pages: set Source to "GitHub Actions".
+# This repo also needs to be public for jmonlabs.github.io to serve it on
+# GitHub's free plan.
+
+name: Deploy to Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow at most one Pages deploy in flight; don't cancel an in-progress one
+# (an interrupted Pages deploy can leave the site in a half-published state).
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: site
+
+      # The REPL's source lives with the player it hosts, in jmon/show.
+      - uses: actions/checkout@v4
+        with:
+          repository: jmonlabs/show
+          path: show
+
+      - name: Assemble _site
+        run: |
+          mkdir -p _site
+          cp site/index.html _site/
+          cp -r show/live    _site/live
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
